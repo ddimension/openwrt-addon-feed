@@ -76,6 +76,21 @@ Tagen). `timeout-minutes: 420` ist Kopffreiheit, kein Ziel.
 - **`publish-pages.sh` liegt in beiden Feeds.** Nicht-site-spezifische
   Änderungen gehören in beide Kopien.
 
+## Versionshistorie
+
+Ein Feed-Ziel wird nicht ersetzt, sondern zusammengeführt: vorhandene `.apk`
+bleiben, gekürzt auf die **neuesten 10 je Paket**
+(`publish-feed.sh --keep 'main/*=10' --keep 'stable/*=10'`, `KEEP_VERSIONS`).
+Danach baut `.github/ci/apk-retention.sh` `packages.adb` neu und **signiert**
+ihn (im Container `image-registry.ddimension.net/myadmin/apk-tools`, weil weder
+Runner noch Host apk v3 haben), dazu `index.json` und `versions.json`. Der
+Publish-Job braucht dafür `PRIVATE_KEY` und einen Registry-Login
+(`REGISTRY_USERNAME`/`REGISTRY_TOKEN`). Auf dem Gerät: `apk add apman=68-r1`
+geht zurück und pinnt, `apk add apman` löst den Pin.
+
+Pakete, die der Build nicht mehr erzeugt, verschwinden samt Historie — nur was
+der frische Baum enthält, wird mitgenommen.
+
 ## Kurzreferenz
 
 ```bash

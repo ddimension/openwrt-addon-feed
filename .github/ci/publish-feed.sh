@@ -25,7 +25,11 @@
 # one of them), the artifacts stay attached to the run for 30 days, and a failed
 # publish should cost minutes, not another build.
 #
-# Env: GH_TOKEN (push credentials; defaults to `gh auth token`),
+# Versions: each published tree keeps the last KEEP_VERSIONS [10] versions of
+# every package, so a device can go back (apk add <pkg>=<version>).
+# publish-pages.sh does the merging and rebuilds the signed index for it.
+#
+# Env: KEEP_VERSIONS [10], GH_TOKEN (push credentials; defaults to `gh auth token`),
 #      GITHUB_REPOSITORY [ddimension/openwrt-addon-feed]. PAGES_* pass through to
 #      publish-pages.sh (PAGES_REMOTE for a dry run against a bare repo).
 set -euo pipefail
@@ -128,8 +132,11 @@ export GITHUB_REPOSITORY="$REPO"
 export PAGES_STAMP_SHA="$SHA" PAGES_STAMP_RUN="${RUN:-${GITHUB_RUN_ID:-local}}"
 echo "publish-feed: $CHANNEL @ ${SHA:0:12}${RUN:+, run $RUN}: $trees trees"
 # not exec: the EXIT trap still has to remove the downloaded artifacts
+KEEP_VERSIONS="${KEEP_VERSIONS:-10}"
 "$here/publish-pages.sh" \
 	-m "packages ($CHANNEL) @ $SHA${RUN:+ (run $RUN)}" \
 	--channel "$CHANNEL" \
 	--keys "$root/keys" \
+	--keep "main/*=$KEEP_VERSIONS" \
+	--keep "stable/*=$KEEP_VERSIONS" \
 	"${pairs[@]}"

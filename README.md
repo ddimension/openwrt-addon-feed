@@ -26,7 +26,7 @@ push there only what is there.
 | `snapcast-mptcp` | Snapcast with Multipath-TCP | `snapserver-mptcp`, `snapclient-mptcp` | [ddimension/snapcast](https://github.com/ddimension/snapcast) | ✓ |
 | `luacurl` | Lua binding for libcurl | same | upstream [Lua-cURL/Lua-cURLv3](https://github.com/Lua-cURL/Lua-cURLv3) | ✓ |
 | `lua-mosquitto` | Lua binding for libmosquitto | same | upstream [flukso/lua-mosquitto](https://github.com/flukso/lua-mosquitto) | ✓ |
-| `nsca-ng` | NSCA-ng client (`send_nsca`): passive check results to Nagios/Icinga over TLS-PSK; what `wwand-apntest` (other feed) reports through | same | upstream [weiss/nsca-ng](https://github.com/weiss/nsca-ng) | ✓ |
+| `nsca-ng` | NSCA-ng client (`send_nsca`): passive check results to Nagios/Icinga over TLS-PSK; what `wwand-apntest` reports through — **the one package a modem box needs from here**, so an APN-test box follows both feeds (`ddimension-feed` r4 sets that up) | same | upstream [weiss/nsca-ng](https://github.com/weiss/nsca-ng) | ✓ |
 | `usb-relay-hid` | control for cheap USB HID relay boards | same | upstream [OzFalcon/usb-relay-hid](https://github.com/OzFalcon/usb-relay-hid) | ✓ |
 | `wpad-ieee8021x` | `ieee8021x` netifd protocol: wired 802.1X through wpa_supplicant's ubus interface | same | local (`files/`) | ✓ |
 | `wpad-saeradh2e` | OpenWrt's full/OpenSSL wpad plus our SAE-over-RADIUS patches (also in [ddimension/hostapd](https://github.com/ddimension/hostapd) `sae-radius-h2e`) | same | OpenWrt `hostapd` + patches | ✓ |
@@ -62,6 +62,11 @@ can see what is live:
 ```sh
 curl -s https://ddimension.github.io/openwrt-addon-feed/stable/openwrt-25.12/mipsel_24kc/.published
 ```
+
+Each tree keeps the **last 10 versions** of every package, so a device can go
+back: `apk add apman=68-r1` downgrades and pins it in `/etc/apk/world`,
+`apk add apman` lifts the pin again. `versions.json` in the tree says which
+versions it has, when each was built and when it was first published.
 
 There is no pre-channel mirror `…/<release>/<arch>/` here: this repo was created
 after the channel split, so no device ever followed one.
