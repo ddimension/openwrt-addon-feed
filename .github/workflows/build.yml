@@ -1,15 +1,21 @@
-# Build the feed for every release branch × package architecture and publish
-# the binary package repositories to GitHub Pages (gh-pages branch).
+# Build the add-on feed for every release branch × package architecture and
+# publish the binary package repositories to GitHub Pages (gh-pages branch).
 #
 # One workflow, two channels:
 #   push to main          -> builds and publishes main/<release>/<arch>/ (development)
 #   push to stable        -> builds only: stable is prepared over several pushes
 #                            (cherry-picks, scripts/stable-take.sh) and nothing of
 #                            it reaches devices yet
-#   release tag on stable -> builds and publishes stable/<release>/<arch>/,
-#     (YYYY.MM.DD[.N],       mirrored to the pre-channel path <release>/<arch>/
-#     release-stable.sh)     that devices set up before the split still follow
+#   release tag on stable -> builds and publishes stable/<release>/<arch>/
+#     (YYYY.MM.DD[.N],
+#     release-stable.sh)
 # A workflow_dispatch on any other branch builds but publishes nothing.
+#
+# This is the add-on half of the split (2026-10-04): the modem stack lives in
+# ddimension/openwrt-repo, everything else here. There is no dependency between
+# the two feeds, and a device adds both — ddimension-feed (in the other repo)
+# writes one .list per feed. No pre-channel mirror <release>/<arch>/ here: no
+# device was ever set up against this repo before the channels existed.
 #
 # Efficiency: a new push cancels the still-running build of the same ref
 # (main, stable and every tag are separate groups), .md-only branch pushes don't
@@ -30,34 +36,19 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # The channel of this run: where its packages are published, and the tree the
-  # ddimension-feed package built here points devices at (the SDK action passes
-  # it into the build). A release tag and the stable branch build as stable,
-  # anything else as main; only main pushes and release tags publish (see the
-  # publish job).
-  DDIMENSION_FEED_CHANNEL: ${{ (github.ref_type == 'tag' || github.ref_name == 'stable') && 'stable' || 'main' }}
+  # The channel of this run: where its packages are published. A release tag and
+  # the stable branch build as stable, anything else as main; only main pushes
+  # and release tags publish (see the publish job).
+  FEED_CHANNEL: ${{ (github.ref_type == 'tag' || github.ref_name == 'stable') && 'stable' || 'main' }}
 
 jobs:
   build:
     runs-on: [self-hosted, openwrt]
-    # 120 was enough until luci-app-wwand-statistics arrived (f21d172): it
-    # depends on luci-app-statistics, which pulls collectd and with it gnutls
-    # and libmicrohttpd. On the slowest arch that is the difference between
-    # finishing and not — arm_cortex-a7_neon-vfpv4/snapshot took 73 and 80
-    # minutes on the two runs before, then hit the limit mid-collectd twice and
-    # left that tree stuck a version behind while every other arch published.
-    # Nothing hung: the log shows it still compiling when the clock ran out.
-    #
-    # 240 -> 300 with the runner fleet of 2026-09-27: the new CTs get 7 cores
-    # where n5/n6 had 10, and a fresh CT starts with empty dl/ccache volumes, so
-    # the first run on it builds everything from scratch. Legs that used to take
-    # 45-75 minutes were past 95 and still going. Five hours is head-room, not a
-    # target — a leg that actually hangs still dies, just later.
-    #
-    # 300 -> 420: openwrt-25.12 legs now run 2.6-4.6 h, and 25.12/x86_64 hit 300
-    # still compiling (run 36922244803, 2026-10-02), leaving that tree a
-    # release behind while the other 15 published. The runners are self-hosted,
-    # so GitHub's 6 h cap for hosted runners does not apply.
+    # 420 min, inherited from the feed this repo was split out of — and this is
+    # the expensive half: snapcast-mptcp drags boost, both wpad variants build
+    # hostapd, apman pulls collectd (gnutls, libmicrohttpd), nsca-ng openssl.
+    # The SDK tree is thrown away per run, so every leg builds that from
+    # scratch. Five to seven hours is head-room, not a target.
     timeout-minutes: 420
     strategy:
       fail-fast: false
@@ -74,9 +65,7 @@ jobs:
           - aarch64_cortex-a53
           - aarch64_cortex-a72
           # rockchip/armv8 (RK33xx/RK35xx) sets ARCH:=aarch64 and no CPU_TYPE,
-          # so the whole subtarget lands on the generic aarch64 package arch —
-          # and with it every Hinlink/NanoPi/Radxa board in that family, none of
-          # which could add this feed at all (ddimension/wwand#23).
+          # so the whole subtarget lands on the generic aarch64 package arch.
           - aarch64_generic
           - arm_cortex-a15_neon-vfpv4
           - arm_cortex-a7_neon-vfpv4
@@ -84,13 +73,9 @@ jobs:
           - mipsel_24kc
           - x86_64
     steps:
-      # Self-hosted-Runner teilen sich das Checkout-Verzeichnis zwischen allen
-      # Jobs beider Workflows. Ein liegengebliebener sparse-checkout (den
-      # build-device-images.yml bis zur Kanal-Trennung nutzte) wurde von
-      # actions/checkout NICHT zuverlaessig zurueckgebaut -> Workspace enthielt nur
-      # .git/.github -> /feed leer -> "No feed for package" -> Jobs rot. Heute
-      # checkt kein Job mehr sparse aus; der Reset bleibt, damit kein alter
-      # Workspace-Stand in einen Build durchschlaegt (Repo ist klein, Vollclone ~gratis).
+      # Self-hosted runners share the checkout directory between all jobs of a
+      # repository. The reset keeps a leftover workspace state out of a build
+      # (the repo is small, a full clone is ~free).
       - name: Reset workspace
         shell: bash
         run: |
@@ -98,35 +83,29 @@ jobs:
           rm -rf "${GITHUB_WORKSPACE:?}"/*
       - uses: actions/checkout@v4
 
-      # No docker.io login any more: the SDK action builds its image with plain
-      # `docker build` from ghcr.io and pulls nothing from docker.io, so there is
-      # no anonymous pull limit left to lift. It used to be needed for the qemu
-      # binfmt image, and docker.io's TLS timeouts then killed whole matrices
-      # (36185475232, 36190510953, 36201899551, 36208538174).
-
       # Per-package mode: the SDK action builds exactly these source packages
       # plus their real dependencies — no whole-feed surface, no exposure to
-      # unrelated upstream breakage (the perl parallel-build race cost us a job
-      # in three runs). The per-package check enforces PKG_MIRROR_HASH: after
-      # every PKG_SOURCE_VERSION bump run scripts/update-hashes.sh and commit
-      # the Makefile change. The list lives in .github/ci/packages, which
-      # scripts/local-build.sh reads too. An empty PACKAGES would make the
-      # action build the WHOLE feed (entrypoint.sh) — heatingrod's rust
-      # toolchain included — so empty is an error, never a default.
+      # unrelated upstream breakage. The per-package check enforces
+      # PKG_MIRROR_HASH: after every PKG_SOURCE_VERSION bump run
+      # scripts/update-hashes.sh and commit the Makefile change. The list lives
+      # in .github/ci/packages, which scripts/local-build.sh reads too. An empty
+      # PACKAGES would make the action build the WHOLE feed (entrypoint.sh) —
+      # heatingrod's rust toolchain included — so empty is an error, never a
+      # default.
       - name: Package list
         run: |
           pkgs="$(sed 's/#.*//' .github/ci/packages | xargs)"
           [ -n "$pkgs" ] || { echo "::error file=.github/ci/packages::no packages listed"; exit 1; }
           echo "PACKAGES=$pkgs" >> "$GITHUB_ENV"
-          echo "channel $DDIMENSION_FEED_CHANNEL, packages: $pkgs"
+          echo "channel $FEED_CHANNEL, packages: $pkgs"
 
       # make -j inside the SDK container. nproc reports the node's cores there:
       # the runner CT's cgroup quota is invisible inside the nested container
       # (own cgroup namespace -> cpu.max = max), so the SDK would overshoot by a
       # factor. The quota is only readable HERE, in the runner CT, so read it
-      # here and pass it in — the same trick build-device-images.yml uses for
-      # the image builds. It also narrows the hostapd parallel-variant race
-      # documented in the action's entrypoint.sh.
+      # here and pass it in. It also narrows the hostapd parallel-variant race
+      # documented in the action's entrypoint.sh — which matters here, this repo
+      # owns both wpad variants.
       - name: Parallelism
         run: |
           jobs="$(nproc)"
@@ -150,32 +129,20 @@ jobs:
         uses: ./.github/actions/openwrt-sdk
         env:
           ARCH: ${{ matrix.arch }}${{ matrix.release != 'snapshot' && format('-{0}', matrix.release) || '' }}
-          # NOTE on registry flakes: the SDK image comes from ghcr.io (action
-          # default; CONTAINER would be the UNTAGGED image — the action appends
-          # :$ARCH itself), and nothing else is pulled — no docker.io, no
-          # buildkit, no binfmt. Should a job still flake: gh run rerun --failed on the
-          # newest run of the branch (an older run builds but does not publish,
-          # see the publish job) — never on a run from before the channel
-          # split, whose publish step would delete main/ and stable/.
-          FEEDNAME: wwand
+          # The SDK image comes from ghcr.io (action default; CONTAINER would be
+          # the UNTAGGED image — the action appends :$ARCH itself), and nothing
+          # else is pulled — no docker.io, no buildkit, no binfmt.
+          #
+          # The feed NAME must differ from the modem feed's ('wwand'): a build
+          # tree that carries both — an image build, a local test — would
+          # otherwise have two src-git entries called the same, and which clone
+          # wins would be up to scripts/feeds.
+          FEEDNAME: ddaddon
           # lifts GitHub's anonymous clone limit for the feed updates; see the
           # note in the action's entrypoint. Read-only, and the default token.
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Bytecode shipping needs NOTHING here, and that is the point.
-          #
-          # It used to be an opt-in symbol pushed through EXTRA_CONFIG, which
-          # turned the whole openwrt-25.12 matrix red: defconfig dropped both
-          # CONFIG_WWAND_UCODE_PRECOMPILE and the CONFIG_PACKAGE_wwand it
-          # depended on, so a per-package SDK build could not carry it. The
-          # Makefile now states the opposite polarity — bytecode is the default
-          # and CONFIG_WWAND_UCODE_SOURCE opts OUT — so a symbol that does not
-          # survive defconfig lands on the behaviour we want instead of
-          # silently reverting it. PKG_BUILD_DEPENDS pulls ucode/host
-          # unconditionally, and the cmake capability probe ships source rather
-          # than failing if that compiler cannot emit bytecode.
-          #
-          # EXTRA_CONFIG stays wired (and is verified after `feeds install`)
-          # for whatever needs it next; it is deliberately empty.
+          # Wired (and verified after `feeds install`) for whatever needs it;
+          # deliberately empty.
           EXTRA_CONFIG: ''
           # PACKAGES comes from the "Package list" step (GITHUB_ENV) — do not
           # set it here, a step env would override it.
@@ -185,21 +152,16 @@ jobs:
           NO_REFRESH_CHECK: 1
           NO_SHFMT_CHECK: 1
           # usign key for opkg-based releases (<= 24.10), apk key for
-          # snapshot/25.12+. Empty secrets simply leave the index unsigned.
+          # snapshot/25.12+. The SAME keys as ddimension/openwrt-repo, so a
+          # device trusts both feeds with the one key it already has. Empty
+          # secrets simply leave the index unsigned.
           KEY_BUILD: ${{ secrets.KEY_BUILD }}
           PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
-          # ddimension-feed can work this out from the buildroot version, but
-          # here it need not guess: this is the directory the publish job below
-          # writes to, so the .list it installs and the tree it points at cannot
-          # disagree. Its channel is DDIMENSION_FEED_CHANNEL (workflow env).
-          DDIMENSION_FEED_RELEASE: ${{ matrix.release }}
 
       # On a red leg the job log only says "failed to build (build variant: …)";
       # the actual compiler/make error lives in the SDK's per-package logs
       # (BUILD_LOG=1 -> logs/package/<feed>/<pkg>/[<variant>/]compile.txt), which
-      # entrypoint.sh copies into the workspace at the end. Without this step
-      # they die with the container and every failure has to be reproduced
-      # locally first (that is how the hostapd variant race stayed invisible).
+      # entrypoint.sh copies into the workspace at the end.
       - name: Upload build logs
         if: failure()
         uses: actions/upload-artifact@v4
@@ -209,30 +171,11 @@ jobs:
           retention-days: 30
           if-no-files-found: ignore
 
-      # ddimension-feed.apk: a name without a version, so the direct download
-      # links in README.md and on the site's start page survive every release
-      # bump. It is not in packages.adb, so apk never sees it as a package of
-      # the repository. (Installed from a file, apk pins it — README.md says to
-      # follow up with `apk add ddimension-feed`.)
       - name: Collect repository
         run: |
           dest="public/${{ matrix.release }}/${{ matrix.arch }}"
           mkdir -p "$dest"
-          cp -a "bin/packages/${{ matrix.arch }}/wwand/." "$dest/"
-          for f in "$dest"/ddimension-feed-[0-9]*.apk; do
-            [ -f "$f" ] && cp "$f" "$dest/ddimension-feed.apk"
-          done
-          # Host tools a package exported into $(BIN_DIR) — today the static
-          # rsim-card, built only on x86_64 (wwand-rsim, Hooks/Compile/Post).
-          # publish-feed.sh turns tools/<arch>/ into tools/<channel>/<arch>/ on
-          # the site, where the start page links it. No leg but x86_64 has one,
-          # and the glob simply finds nothing there.
-          for t in bin/targets/*/*/rsim-card; do
-            [ -f "$t" ] || continue
-            mkdir -p "public/tools/${{ matrix.arch }}"
-            cp "$t" "public/tools/${{ matrix.arch }}/"
-            echo "host tool: $t -> public/tools/${{ matrix.arch }}/"
-          done
+          cp -a "bin/packages/${{ matrix.arch }}/ddaddon/." "$dest/"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -252,7 +195,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      # s.o.: vollen Baum erzwingen, sonst fehlen z.B. keys/ und .github/ci/.
+      # Full tree: keys/ and .github/ci/ are needed here.
       - name: Reset workspace
         shell: bash
         run: |
@@ -270,11 +213,10 @@ jobs:
           path: fresh
           merge-multiple: true
 
-      # Replaces exactly <channel>/<release>/<arch> for every leg that built
-      # (plus the pre-channel mirror for stable) and nothing else — the other
-      # channel and the device images stay as they are. Concurrent publishes
-      # (the other channel, the image run) are handled in publish-pages.sh,
-      # the newest-commit rule in publish-feed.sh.
+      # Replaces exactly <channel>/<release>/<arch> for every leg that built and
+      # nothing else — the other channel stays as it is. Concurrent publishes
+      # are handled in publish-pages.sh, the newest-commit rule in
+      # publish-feed.sh.
       - name: Publish to gh-pages
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -285,4 +227,4 @@ jobs:
           tag=()
           [ "$GITHUB_REF_TYPE" != tag ] || tag=(--tag "$GITHUB_REF_NAME")
           .github/ci/publish-feed.sh --dir fresh \
-            --channel "$DDIMENSION_FEED_CHANNEL" --sha "$GITHUB_SHA" --run "$GITHUB_RUN_ID" "${tag[@]}"
+            --channel "$FEED_CHANNEL" --sha "$GITHUB_SHA" --run "$GITHUB_RUN_ID" "${tag[@]}"

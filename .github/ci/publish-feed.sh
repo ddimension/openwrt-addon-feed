@@ -12,20 +12,21 @@
 #
 # main publishes from a push to the main branch; stable ONLY from a release
 # tag (YYYY.MM.DD[.N], scripts/release-stable.sh) — a push to the stable branch
-# builds and publishes nothing. stable also rewrites the pre-channel mirror
-# <release>/<arch>/. Every <release>/<arch>/packages.adb found is published; a
-# leg that has none keeps its published state (publish-pages.sh guards that too).
+# builds and publishes nothing. Every <release>/<arch>/packages.adb found is
+# published; a leg that has none keeps its published state (publish-pages.sh
+# guards that too). There is no pre-channel mirror <release>/<arch>/ in this
+# repo: it was split off after the channels existed, so no device follows one.
 #
 # A late publish must never roll a channel back, so this refuses (with a
 # warning, exit 0) when main has moved on since the run, or when the release
 # tag no longer points at the run's commit or a newer release tag exists.
 #
-# Why it exists: a feed build takes hours (14 legs of 50-75 minutes on three
-# runners), the artifacts stay attached to the run for 30 days, and a failed
+# Why it exists: a feed build takes hours (16 legs, boost and hostapd in every
+# one of them), the artifacts stay attached to the run for 30 days, and a failed
 # publish should cost minutes, not another build.
 #
 # Env: GH_TOKEN (push credentials; defaults to `gh auth token`),
-#      GITHUB_REPOSITORY [ddimension/openwrt-repo]. PAGES_* pass through to
+#      GITHUB_REPOSITORY [ddimension/openwrt-addon-feed]. PAGES_* pass through to
 #      publish-pages.sh (PAGES_REMOTE for a dry run against a bare repo).
 set -euo pipefail
 
@@ -33,7 +34,7 @@ here="$(cd "$(dirname "$0")" && pwd)"
 root="$(cd "$here/../.." && pwd)"
 die() { echo "publish-feed: $*" >&2; exit 1; }
 
-REPO="${GITHUB_REPOSITORY:-ddimension/openwrt-repo}"
+REPO="${GITHUB_REPOSITORY:-ddimension/openwrt-addon-feed}"
 RELEASE_TAG_RE='^20[0-9]{2}\.[0-9]{2}\.[0-9]{2}(\.[0-9]+)?$'
 DIR="" CHANNEL="" SHA="" RUN="" TAG=""
 case "${1:-}" in
@@ -116,19 +117,7 @@ while IFS= read -r adb; do
 	rel="${rel##*/}"
 	pairs+=("$d=$CHANNEL/$rel/$arch")
 	trees=$((trees + 1))
-	if [ "$CHANNEL" = stable ]; then
-		pairs+=("$d=$rel/$arch")
-	fi
 done < <(find "$DIR" -name packages.adb | sort)
-# Host tools the build produced next to the packages (CI collects them as
-# tools/<arch>/): they are not part of any repository index, so they go to
-# tools/<channel>/<arch>/ — one place per channel, linked from the start page.
-if [ -d "$DIR/tools" ]; then
-	while IFS= read -r td; do
-		pairs+=("$td=tools/$CHANNEL/${td##*/}")
-		echo "tool tree: ${td##*/}"
-	done < <(find "$DIR/tools" -mindepth 1 -maxdepth 1 -type d | sort)
-fi
 [ ${#pairs[@]} -gt 0 ] || die "no package trees (<release>/<arch>/packages.adb) under $DIR"
 
 if [ -z "${GH_TOKEN:-}" ] && [ -z "${PAGES_REMOTE:-}" ] && command -v gh >/dev/null; then
@@ -137,9 +126,7 @@ if [ -z "${GH_TOKEN:-}" ] && [ -z "${PAGES_REMOTE:-}" ] && command -v gh >/dev/n
 fi
 export GITHUB_REPOSITORY="$REPO"
 export PAGES_STAMP_SHA="$SHA" PAGES_STAMP_RUN="${RUN:-${GITHUB_RUN_ID:-local}}"
-mirror=""
-if [ "$CHANNEL" = stable ]; then mirror=" + the pre-channel mirror"; fi
-echo "publish-feed: $CHANNEL @ ${SHA:0:12}${RUN:+, run $RUN}: $trees trees$mirror"
+echo "publish-feed: $CHANNEL @ ${SHA:0:12}${RUN:+, run $RUN}: $trees trees"
 # not exec: the EXIT trap still has to remove the downloaded artifacts
 "$here/publish-pages.sh" \
 	-m "packages ($CHANNEL) @ $SHA${RUN:+ (run $RUN)}" \

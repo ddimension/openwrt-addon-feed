@@ -16,27 +16,27 @@ if [ ! -x scripts/feeds ]; then
 	}
 fi
 
-grep -q "src-link wwand /feed" feeds.conf.default 2>/dev/null ||
-	echo "src-link wwand /feed" >>feeds.conf.default
+grep -q "src-link ddaddon /feed" feeds.conf.default 2>/dev/null ||
+	echo "src-link ddaddon /feed" >>feeds.conf.default
 ./scripts/feeds update -a >/logs/feeds.log 2>&1
-./scripts/feeds install -a -p wwand >>/logs/feeds.log 2>&1
+./scripts/feeds install -a -p ddaddon >>/logs/feeds.log 2>&1
 make defconfig >/logs/defconfig.log 2>&1
 
 # One batched build: all packages at once, keep-going so a single failure
 # doesn't hide the others.
 GOALS=""
-for p in $PACKAGES; do GOALS="$GOALS package/feeds/wwand/$p/compile"; done
+for p in $PACKAGES; do GOALS="$GOALS package/feeds/ddaddon/$p/compile"; done
 make -j"$NPROC" -k $GOALS >/logs/batch.log 2>&1
 
 # Classify: a no-op recompile succeeds instantly for built packages.
 rc=0
 for p in $PACKAGES; do
-	if make "package/feeds/wwand/$p/compile" >/dev/null 2>&1; then
+	if make "package/feeds/ddaddon/$p/compile" >/dev/null 2>&1; then
 		echo "PASS: $p"
 	else
 		rc=1
 		echo "FAIL: $p"
-		make -j1 "package/feeds/wwand/$p/compile" V=s >"/logs/vbuild-$p.log" 2>&1
+		make -j1 "package/feeds/ddaddon/$p/compile" V=s >"/logs/vbuild-$p.log" 2>&1
 		grep -E "error:|Error [0-9]+|ERROR:|undefined reference" "/logs/vbuild-$p.log" |
 			head -8 | sed 's/^/  ERR /'
 	fi

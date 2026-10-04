@@ -5,15 +5,14 @@
 #   scripts/local-build.sh                          # full default matrix
 #   ARCHS=x86_64 scripts/local-build.sh             # one arch
 #   RELEASES=snapshot ARCHS=aarch64_cortex-a53 \
-#     PACKAGES=wwand scripts/local-build.sh         # one package, one combo
+#     PACKAGES=apman scripts/local-build.sh         # one package, one combo
 #
 # Env knobs (defaults match the CI workflow):
 #   RELEASES  release branches ('snapshot' = master)   [snapshot openwrt-25.12]
-#   ARCHS     package architectures                    [7-arch CI matrix]
+#   ARCHS     package architectures                    [8-arch CI matrix]
 #   PACKAGES  source packages to build                 [.github/ci/packages]
 #   NPROC     make parallelism inside the container    [8]
-#   LOGDIR    per-combo build logs                     [/tmp/openwrt-repo-local-build]
-#   DDIMENSION_FEED_CHANNEL  tree ddimension-feed points at: main|stable [stable]
+#   LOGDIR    per-combo build logs                     [/tmp/addon-feed-local-build]
 #
 # Behaviour:
 # - one persistent docker volume per <release>/<arch> keeps the SDK setup and
@@ -32,14 +31,14 @@ ARCHS="${ARCHS:-aarch64_cortex-a53 aarch64_cortex-a72 aarch64_generic arm_cortex
 PACKAGES="${PACKAGES:-$(sed 's/#.*//' .github/ci/packages | xargs)}"
 [ -n "$PACKAGES" ] || { echo "no packages: .github/ci/packages is empty" >&2; exit 1; }
 NPROC="${NPROC:-8}"
-LOGDIR="${LOGDIR:-/tmp/openwrt-repo-local-build}"
+LOGDIR="${LOGDIR:-/tmp/addon-feed-local-build}"
 
 fail=0
 for rel in $RELEASES; do
 	for arch in $ARCHS; do
 		tag=$arch
 		[ "$rel" != "snapshot" ] && tag="$arch-$rel"
-		vol="sdk-$rel-$arch"
+		vol="addon-sdk-$rel-$arch"
 		mkdir -p "$LOGDIR/$rel-$arch" && chmod 777 "$LOGDIR/$rel-$arch"
 		echo "COMBO START: $rel/$arch"
 		if docker run --rm --ulimit nofile=1024:1048576 \

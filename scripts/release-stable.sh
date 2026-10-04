@@ -6,20 +6,19 @@
 # stable is a branch of its own, not a pointer onto main: it is fed by
 # cherry-picks, by scripts/stable-take.sh (packages, .github, or all of main),
 # and by fixes made on stable and merged up into main. Pushing to stable only
-# BUILDS (build.yml); devices and images see nothing until a release tag is
-# pushed — that build publishes stable/<release>/<arch>/ and the pre-channel
-# mirror <release>/<arch>/, and its success starts the device images
-# (build-device-images.yml). So stable can be prepared over several pushes.
+# BUILDS (build.yml); devices see nothing until a release tag is pushed — that
+# build publishes stable/<release>/<arch>/. So stable can be prepared over
+# several pushes. (Device images are built from the modem feed,
+# ddimension/openwrt-repo; a release here does not start one.)
 #
 # Refused:
 #   - <ref> not on origin/stable (push it there first, let it build);
 #   - <ref> without a successful build run (--no-ci-check skips the check, for
 #     a commit that only touched *.md and so built nothing, say);
 #   - <ref> already released;
-#   - a development version: X.Y.Z_pN or X.Y.Z_preN anywhere (see
-#     scripts/bump-source.sh), and wwand, luci-app-wwand and luci-proto-wwand
-#     must carry a real one — stable is what devices upgrade along, and that
-#     only works with real version numbers. --allow-dev overrides.
+#   - a development version: X.Y.Z_pN or X.Y.Z_preN anywhere — stable is what
+#     devices upgrade along, and that only works with real version numbers.
+#     --allow-dev overrides.
 # The tag is YYYY.MM.DD (.2, .3 … for a further release that day), annotated,
 # its message the commits and package versions since the previous release tag.
 # Nothing local is modified and nothing is checked out; -y skips the question.
@@ -32,9 +31,13 @@ cd "$(dirname "$0")/.."
 
 die() { echo "release-stable: $*" >&2; exit 1; }
 
-RELEASE_VERSIONED="wwand luci-app-wwand luci-proto-wwand"
+# Packages whose version must be a real release, not a date~commit snapshot.
+# Empty here: every add-on package carries a hand-written PKG_VERSION, and
+# wpad-saeradh2e deliberately uses <date>~<commit> (it tracks a hostapd commit).
+# The modem feed fills this with its stack packages.
+RELEASE_VERSIONED=""
 REMOTE="${RELEASE_REMOTE:-origin}"
-REPO="${RELEASE_REPO:-ddimension/openwrt-repo}"
+REPO="${RELEASE_REPO:-ddimension/openwrt-addon-feed}"
 YES=0
 ALLOW_DEV=0
 CI_CHECK=1

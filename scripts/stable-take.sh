@@ -11,11 +11,10 @@
 # it came from; --all is a real merge. Nothing goes live by this — the push
 # builds stable, a release tag publishes it.
 #
-# A stack package (wwand, luci-app-wwand, luci-proto-wwand) taken from main
-# brings main's X.Y.Z_preN development version along, and release-stable.sh
-# refuses to release that: those reach stable through their source's stable
-# branch instead — check out stable and run scripts/bump-source.sh <pkg> vX.Y.Z.
-# Ordinary `git cherry-pick -x <commit>` onto stable stays just as fine.
+# Every package here carries a hand-written PKG_VERSION, so a directory taken
+# from main is releasable as it stands (the modem feed has stack packages where
+# that is not true). Ordinary `git cherry-pick -x <commit>` onto stable stays
+# just as fine.
 #
 # Works in a temporary worktree: the current checkout is never touched. -y
 # pushes without asking.

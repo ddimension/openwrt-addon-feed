@@ -3,7 +3,7 @@
 # write the values into the Makefiles.
 #
 #   scripts/update-hashes.sh              # all git-source packages
-#   scripts/update-hashes.sh wwand        # just one (after a version bump)
+#   scripts/update-hashes.sh apman        # just one (after a version bump)
 #
 # Run this after every PKG_SOURCE_VERSION bump, commit the Makefile change.
 # CI runs gh-action-sdk in per-package mode, whose check hard-fails on a
@@ -22,7 +22,7 @@ set -eu
 cd "$(dirname "$0")/.."
 FEED=$PWD
 SDK_TAG="${SDK_TAG:-x86_64}"
-LOGDIR="${LOGDIR:-/tmp/openwrt-repo-hash-update}"
+LOGDIR="${LOGDIR:-/tmp/addon-feed-hash-update}"
 mkdir -p "$LOGDIR" && chmod 777 "$LOGDIR"
 
 # git-source packages (PKG_SOURCE_PROTO:=git) unless given as arguments
@@ -40,16 +40,16 @@ cd /builder
 if [ ! -x scripts/feeds ]; then
 	./setup.sh >/logs/setup.log 2>&1 || { echo "SETUP FAILED"; tail -5 /logs/setup.log; exit 1; }
 fi
-grep -q "src-link wwand /feed" feeds.conf.default 2>/dev/null ||
-	echo "src-link wwand /feed" >>feeds.conf.default
+grep -q "src-link ddaddon /feed" feeds.conf.default 2>/dev/null ||
+	echo "src-link ddaddon /feed" >>feeds.conf.default
 ./scripts/feeds update -a >/logs/feeds.log 2>&1
-./scripts/feeds install -a -p wwand >>/logs/feeds.log 2>&1
+./scripts/feeds install -a -p ddaddon >>/logs/feeds.log 2>&1
 make defconfig >/logs/defconfig.log 2>&1
 : >/logs/hashes.txt
 for pkg in $PKGS; do
 	rm -f dl/"$pkg"-* 2>/dev/null
-	raw=$( (make "package/feeds/wwand/$pkg/download" V=s 2>&1;
-	        make "package/feeds/wwand/$pkg/check" V=s 2>&1) )
+	raw=$( (make "package/feeds/ddaddon/$pkg/download" V=s 2>&1;
+	        make "package/feeds/ddaddon/$pkg/check" V=s 2>&1) )
 	out=$(printf '%s\n' "$raw" |
 		grep -oE "(set to|got) [0-9a-f]{64}" | tail -1 | awk '{print $NF}')
 
@@ -73,7 +73,7 @@ EOF
 
 docker run --rm --ulimit nofile=1024:1048576 \
 	-e PKGS="$PKGS" \
-	-v openwrt-repo-hash-sdk:/builder \
+	-v addon-feed-hash-sdk:/builder \
 	-v "$FEED:/feed:ro" \
 	-v "$LOGDIR:/logs" \
 	"openwrt/sdk:$SDK_TAG" sh /logs/inner.sh

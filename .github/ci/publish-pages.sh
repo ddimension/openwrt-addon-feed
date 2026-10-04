@@ -1,18 +1,18 @@
 #!/bin/bash
 # The one writer of the gh-pages branch — the site the feed is served from.
 #
-# Both workflows publish through here: build.yml the package trees of one
-# channel, build-device-images.yml the device images. One layout, one index
-# generator, one way onto the branch. A call replaces exactly the directories
-# it is given and nothing else; whatever another run put there stays.
+# build.yml publishes through here: the package trees of one channel. One
+# layout, one index generator, one way onto the branch. A call replaces exactly
+# the directories it is given and nothing else; whatever another run put there
+# stays. (Device images live in ddimension/openwrt-repo, which has its own copy
+# of this script — keep the two in step when you change one.)
 #
 #   publish-pages.sh -m MSG [--channel C] [--keys DIR] [--remove DEST]... [SRC=DEST]...
 #
 #   SRC=DEST       replace DEST (relative to the site root) wholesale with the
 #                  contents of SRC. Guarded, so a half-failed build cannot
-#                  replace the last good state: a target under images/ needs
-#                  at least one *sysupgrade* file in SRC, any other target a
-#                  SRC/packages.adb. A pair that fails its guard is skipped.
+#                  replace the last good state: SRC must carry a packages.adb.
+#                  A pair that fails its guard is skipped.
 #   --remove DEST  delete DEST, e.g. the tree of a release no longer built
 #   --keys DIR     overlay DIR onto keys/: files are added or updated, never
 #                  deleted — a device may know a key under an old name
@@ -47,9 +47,8 @@
 # times for everything this run did not write, so they would lie — and
 # build-device-images.yml polls it to know when a commit's tree is live.
 #
-# The start page lists, per architecture, the trees of both channels and the
-# versionless ddimension-feed.apk in each (build.yml puts it there), built
-# from what is actually on the site — a link on it never points at nothing.
+# The start page lists, per architecture, the trees of both channels, built from
+# what is actually on the site — a link on it never points at nothing.
 set -euo pipefail
 
 die() { echo "publish-pages: $*" >&2; exit 1; }
@@ -95,29 +94,12 @@ for pair in ${PAIRS[@]+"${PAIRS[@]}"}; do
 		echo "::warning::publish-pages: $src does not exist, $DEST keeps its published state"
 		continue
 	fi
-	case "$DEST" in
-	images/*)
-		if [ -z "$(find "$src" -type f -name '*sysupgrade*' -print -quit)" ]; then
-			echo "::warning::publish-pages: no sysupgrade image in $src, $DEST keeps its published state"
-			continue
-		fi
-		;;
-	tools/*)
-		# Host tools (today: the static rsim-card a SIM host runs). Plain
-		# files, no index and no image, so neither guard below fits — an empty
-		# directory is still refused, a half-finished leg must not wipe one.
-		if [ -z "$(find "$src" -type f -print -quit)" ]; then
-			echo "::warning::publish-pages: no file in $src, $DEST keeps its published state"
-			continue
-		fi
-		;;
-	*)
-		if [ ! -f "$src/packages.adb" ]; then
-			echo "::warning::publish-pages: no packages.adb in $src, $DEST keeps its published state"
-			continue
-		fi
-		;;
-	esac
+	# Only package trees are published from this repo (no images, no host
+	# tools), so one guard: a half-failed build must not replace a good tree.
+	if [ ! -f "$src/packages.adb" ]; then
+		echo "::warning::publish-pages: no packages.adb in $src, $DEST keeps its published state"
+		continue
+	fi
 	ACCEPTED+=("$(cd "$src" && pwd)=$DEST")
 done
 REMOVE_OK=()
@@ -141,7 +123,7 @@ read -r BACKOFF_MIN BACKOFF_MAX <<<"${PAGES_BACKOFF:-10 40}"
 STAMP_SHA="${PAGES_STAMP_SHA:-${GITHUB_SHA:-$(git rev-parse HEAD 2>/dev/null || echo unknown)}}"
 RUN_ID="${PAGES_STAMP_RUN:-${GITHUB_RUN_ID:-local}}"
 NOW="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-SITE_URL="${PAGES_SITE_URL:-https://ddimension.github.io/openwrt-repo}"
+SITE_URL="${PAGES_SITE_URL:-https://ddimension.github.io/openwrt-addon-feed}"
 
 # Credentials through environment-scoped git config: not on any command line
 # and not in any .git/config. A token in the clone URL — how this used to be
@@ -286,7 +268,7 @@ breadcrumb() {
 	local rel="$1" up="" i depth=0 parts=() out
 	[ -n "$rel" ] && IFS=/ read -r -a parts <<<"$rel" && depth=${#parts[@]}
 	for ((i = 0; i < depth; i++)); do up+="../"; done
-	out="<a href=\"${up:-./}\">openwrt-repo</a>"
+	out="<a href=\"${up:-./}\">openwrt-addon-feed</a>"
 	for ((i = 0; i < depth; i++)); do
 		up="${up#../}"
 		out+=" / <a href=\"${up:-./}\">${parts[i]}</a>"
@@ -294,10 +276,10 @@ breadcrumb() {
 	printf '%s' "$out"
 }
 
-# The start page: how to set a device up, and per architecture the trees of
-# both channels with the ddimension-feed.apk in each — only what exists.
+# The start page: what this feed is, how to add it, and per architecture the
+# trees of both channels — only what exists.
 landing() {
-	local rels archs r a ch d cell tools_link
+	local rels archs r a ch d cell
 	# if, not `test && find`: under pipefail a loop whose last test fails makes
 	# the whole command substitution fail, and set -e ends the script without a
 	# word — which is what the very first publish did, when main/ did not exist.
@@ -308,14 +290,16 @@ landing() {
 	archs="$(for ch in stable main; do for r in $rels; do
 		if [ -d "$SITE/$ch/$r" ]; then find "$SITE/$ch/$r" -mindepth 1 -maxdepth 1 -type d -printf '%f\n'; fi
 	done; done | sort -u)"
-	printf '<h2>Set up a device</h2>'
-	printf '<p>Install <code>ddimension-feed</code> once, by name, from the tree that matches the device —'
-	printf ' it carries the feed address and the signing key, and keeps both current with <code>apk upgrade</code>:</p>'
-	printf '<pre>apk --allow-untrusted \\\n  -X %s/stable/&lt;release&gt;/&lt;arch&gt;/packages.adb \\\n  add ddimension-feed\napk update\napk add wwand luci-app-wwand</pre>' "$SITE_URL"
-	printf '<p><b>stable</b> = releases, <b>main</b> = development. A downloaded <code>ddimension-feed.apk</code>'
-	printf ' works too: <code>apk add --allow-untrusted ./ddimension-feed.apk &amp;&amp; apk update &amp;&amp; apk add ddimension-feed</code>'
-	printf ' — the last step turns the file install into a normal one, otherwise apk keeps it pinned and never upgrades it.'
-	printf ' Details: <a href="https://github.com/ddimension/openwrt-repo#how-tos">README</a>.</p>'
+	printf '<h2>Add this feed</h2>'
+	printf '<p>These are the add-on packages: <code>apman</code>, <code>snapcast-mptcp</code>/<code>homesync</code>,'
+	printf ' the <code>wpad</code> variants, <code>nsca-ng</code>, <code>usb-relay-hid</code> and the lua bits.'
+	printf ' The modem stack (<code>wwand</code> and its LuCI apps) lives in'
+	printf ' <a href="https://ddimension.github.io/openwrt-repo/">openwrt-repo</a> — both are signed with the'
+	printf ' <b>same key</b>, so a device that already trusts one trusts this one too.</p>'
+	printf '<p>Install <code>ddimension-feed</code> from the other feed once; it writes a <code>.list</code> for'
+	printf ' both. By hand, for one device:</p>'
+	printf '<pre>cat &gt;/etc/apk/repositories.d/ddimension-addon.list &lt;&lt;EOF\n%s/stable/&lt;release&gt;/&lt;arch&gt;/packages.adb\nEOF\napk update</pre>' "$SITE_URL"
+	printf '<p><b>stable</b> = releases, <b>main</b> = development.</p>'
 	printf '<h2>Feeds</h2><table><tr><th>Arch</th>'
 	for ch in stable main; do for r in $rels; do printf '<th>%s · %s</th>' "$ch" "$r"; done; done
 	printf '</tr>'
@@ -325,8 +309,6 @@ landing() {
 			d="$ch/$r/$a"
 			if [ -f "$SITE/$d/packages.adb" ]; then
 				cell="<a href=\"$d/\">tree</a>"
-				[ -f "$SITE/$d/ddimension-feed.apk" ] &&
-					cell+=" · <a href=\"$d/ddimension-feed.apk\">ddimension-feed.apk</a>"
 			else
 				cell='<span class="dim">—</span>'
 			fi
@@ -335,40 +317,9 @@ landing() {
 		printf '</tr>'
 	done
 	printf '</table>'
-	# tools/ only once something published there, so the sentence does not point
-	# at a 404 on a site that has no host tool yet.
-	tools_link=""
-	if [ -d "$SITE/tools" ]; then
-		tools_link=' host tools: <a href="tools/">tools/</a>,'
-	fi
-	printf '<p>The top-level <code>&lt;release&gt;/</code> trees mirror <code>stable/</code> for devices set up'
-	printf ' before the channels existed. Device images: <a href="images/">images/</a>,%s signing keys:' "$tools_link"
-	printf ' <a href="keys/">keys/</a>. Source: <a href="https://github.com/ddimension/openwrt-repo">ddimension/openwrt-repo</a>.</p>'
-	# Host tools, when a build published some. Same `if`, not `test &&`, for the
-	# reason given above: this runs as the last command of the function.
-	if [ -d "$SITE/tools" ]; then
-		printf '<h2>Tools</h2>'
-		printf '<p><code>rsim-card</code> is what a <b>SIM host</b> needs — the machine whose reader holds the card for'
-		printf ' <code>option rsim_reader ssh:&lt;user&gt;@&lt;host&gt;:&lt;reader&gt;</code>. wwand runs it there <i>by name</i>,'
-		printf ' so it belongs in that machine&#39;s PATH; these builds are linked statically and need nothing installed:</p>'
-		printf '<pre>install -m755 rsim-card /usr/local/bin/rsim-card</pre>'
-		printf '<table><tr><th>Channel</th><th>Arch</th><th>Tool</th></tr>'
-		for ch in stable main; do
-			if [ -d "$SITE/tools/$ch" ]; then
-				for a in $(find "$SITE/tools/$ch" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort); do
-					cell=""
-					for d in "$SITE/tools/$ch/$a"/*; do
-						[ -f "$d" ] || continue
-						case "${d##*/}" in index.html | .published) continue ;; esac
-						[ -n "$cell" ] && cell+=" · "
-						cell+="<a href=\"tools/$ch/$a/${d##*/}\">${d##*/}</a>"
-					done
-					printf '<tr><td>%s</td><td>%s</td><td>%s</td></tr>' "$ch" "$a" "${cell:-<span class=\"dim\">—</span>}"
-				done
-			fi
-		done
-		printf '</table>'
-	fi
+	printf '<p>Signing keys: <a href="keys/">keys/</a>. Source:'
+	printf ' <a href="https://github.com/ddimension/openwrt-addon-feed">ddimension/openwrt-addon-feed</a>,'
+	printf ' modem feed: <a href="https://github.com/ddimension/openwrt-repo">ddimension/openwrt-repo</a>.</p>'
 	printf '<h2>Everything</h2>'
 }
 
@@ -380,7 +331,7 @@ write_index() {
 	{
 		printf '<!doctype html><meta charset="utf-8">'
 		printf '<meta name="viewport" content="width=device-width,initial-scale=1">'
-		printf '<title>openwrt-repo/%s</title><style>%s</style>' "$rel" "$CSS"
+		printf '<title>openwrt-addon-feed/%s</title><style>%s</style>' "$rel" "$CSS"
 		printf '<h1>%s</h1>' "$(breadcrumb "$rel")"
 		[ -z "$rel" ] && landing
 		printf '<table><tr><th>Name</th><th>Size</th><th>Date</th><th>Time (UTC)</th></tr>'
