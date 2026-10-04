@@ -63,6 +63,11 @@ can see what is live:
 curl -s https://ddimension.github.io/openwrt-addon-feed/stable/openwrt-25.12/mipsel_24kc/.published
 ```
 
+Each tree keeps the **last 10 versions** of every package, so a device can go
+back: `apk add apman=68-r1` downgrades and pins it in `/etc/apk/world`,
+`apk add apman` lifts the pin again. `versions.json` in the tree says which
+versions it has, when each was built and when it was first published.
+
 There is no pre-channel mirror `…/<release>/<arch>/` here: this repo was created
 after the channel split, so no device ever followed one.
 
