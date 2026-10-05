@@ -1,0 +1,146 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.4",
+  "serialNumber": "urn:uuid:8d48c5d8-4cdd-5fa9-a884-468bb8410923",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-10-04T09:52:27Z"
+  },
+  "components": [
+    {
+      "name": "apman",
+      "version": "68-r1",
+      "type": "application",
+      "licenses": [
+        {
+          "license": {
+            "name": "GPL-2.0-only"
+          }
+        }
+      ]
+    },
+    {
+      "name": "homesync",
+      "version": "7-r3",
+      "type": "application",
+      "licenses": [
+        {
+          "license": {
+            "name": "GPL-2.0-only"
+          }
+        }
+      ]
+    },
+    {
+      "name": "libubus-lua-async",
+      "version": "2026.06.28~24864e78-r2",
+      "type": "library",
+      "licenses": [
+        {
+          "license": {
+            "name": "LGPL-2.1"
+          }
+        }
+      ]
+    },
+    {
+      "name": "lua-mosquitto",
+      "version": "0.4.1.9.1-r2",
+      "type": "application",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "name": "luacurl",
+      "version": "0.3.13-r1",
+      "type": "application",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "name": "nsca-ng",
+      "version": "1.7-r1",
+      "type": "application",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD-2-Clause"
+          }
+        }
+      ]
+    },
+    {
+      "name": "snapclient-mptcp",
+      "version": "0.35.0-r1",
+      "cpe": "cpe:/a:badaix:snapcast",
+      "type": "application",
+      "licenses": [
+        {
+          "license": {
+            "name": "GPL-3.0-or-later"
+          }
+        }
+      ]
+    },
+    {
+      "name": "snapserver-mptcp",
+      "version": "0.35.0-r1",
+      "cpe": "cpe:/a:badaix:snapcast",
+      "type": "application",
+      "licenses": [
+        {
+          "license": {
+            "name": "GPL-3.0-or-later"
+          }
+        }
+      ]
+    },
+    {
+      "name": "usb-relay-hid",
+      "version": "2.2.0.1-r0",
+      "type": "application",
+      "licenses": [
+        {
+          "license": {
+            "name": "GPL-2.0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "wpad-ieee8021x",
+      "version": "1-r3",
+      "type": "application",
+      "licenses": [
+        {
+          "license": {
+            "name": "GPL-2.0-only"
+          }
+        }
+      ]
+    },
+    {
+      "name": "wpad-saeradh2e",
+      "version": "2026.08.07~831364bf-r3",
+      "cpe": "cpe:/a:w1.fi:hostapd",
+      "type": "application",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD-3-Clause"
+          }
+        }
+      ]
+    }
+  ]
+}

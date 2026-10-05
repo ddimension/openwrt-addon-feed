@@ -1,0 +1,90 @@
+{
+ "apman-68-r1.apk": {
+  "commit": "4e390a884173e2dbd0f4086da31f26f1f953e7a2",
+  "name": "apman",
+  "published": "2026-10-04T21:47:41Z",
+  "run": "37193874748",
+  "size": 60129,
+  "version": "68-r1"
+ },
+ "homesync-7-r3.apk": {
+  "commit": "4e390a884173e2dbd0f4086da31f26f1f953e7a2",
+  "name": "homesync",
+  "published": "2026-10-04T21:47:41Z",
+  "run": "37193874748",
+  "size": 4416,
+  "version": "7-r3"
+ },
+ "libubus-lua-async-2026.06.28~24864e78-r2.apk": {
+  "commit": "4e390a884173e2dbd0f4086da31f26f1f953e7a2",
+  "name": "libubus-lua-async",
+  "published": "2026-10-04T21:47:41Z",
+  "run": "37193874748",
+  "size": 9541,
+  "version": "2026.06.28~24864e78-r2"
+ },
+ "lua-mosquitto-0.4.1.9.1-r2.apk": {
+  "commit": "4e390a884173e2dbd0f4086da31f26f1f953e7a2",
+  "name": "lua-mosquitto",
+  "published": "2026-10-04T21:47:41Z",
+  "run": "37193874748",
+  "size": 7705,
+  "version": "0.4.1.9.1-r2"
+ },
+ "luacurl-0.3.13-r1.apk": {
+  "commit": "4e390a884173e2dbd0f4086da31f26f1f953e7a2",
+  "name": "luacurl",
+  "published": "2026-10-04T21:47:41Z",
+  "run": "37193874748",
+  "size": 62799,
+  "version": "0.3.13-r1"
+ },
+ "nsca-ng-1.7-r1.apk": {
+  "commit": "4e390a884173e2dbd0f4086da31f26f1f953e7a2",
+  "name": "nsca-ng",
+  "published": "2026-10-04T21:47:41Z",
+  "run": "37193874748",
+  "size": 19539,
+  "version": "1.7-r1"
+ },
+ "snapclient-mptcp-0.35.0-r1.apk": {
+  "commit": "4e390a884173e2dbd0f4086da31f26f1f953e7a2",
+  "name": "snapclient-mptcp",
+  "published": "2026-10-04T21:47:41Z",
+  "run": "37193874748",
+  "size": 376913,
+  "version": "0.35.0-r1"
+ },
+ "snapserver-mptcp-0.35.0-r1.apk": {
+  "commit": "4e390a884173e2dbd0f4086da31f26f1f953e7a2",
+  "name": "snapserver-mptcp",
+  "published": "2026-10-04T21:47:41Z",
+  "run": "37193874748",
+  "size": 764326,
+  "version": "0.35.0-r1"
+ },
+ "usb-relay-hid-2.2.0.1-r0.apk": {
+  "commit": "4e390a884173e2dbd0f4086da31f26f1f953e7a2",
+  "name": "usb-relay-hid",
+  "published": "2026-10-04T21:47:41Z",
+  "run": "37193874748",
+  "size": 6133,
+  "version": "2.2.0.1-r0"
+ },
+ "wpad-ieee8021x-1-r3.apk": {
+  "commit": "4e390a884173e2dbd0f4086da31f26f1f953e7a2",
+  "name": "wpad-ieee8021x",
+  "published": "2026-10-04T21:47:41Z",
+  "run": "37193874748",
+  "size": 1847,
+  "version": "1-r3"
+ },
+ "wpad-saeradh2e-2026.08.07~831364bf-r3.apk": {
+  "commit": "4e390a884173e2dbd0f4086da31f26f1f953e7a2",
+  "name": "wpad-saeradh2e",
+  "published": "2026-10-04T21:47:41Z",
+  "run": "37193874748",
+  "size": 1007343,
+  "version": "2026.08.07~831364bf-r3"
+ }
+}

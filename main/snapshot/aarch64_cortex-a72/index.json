@@ -1,0 +1,17 @@
+{
+  "version": 2,
+  "architecture": "aarch64_cortex-a72",
+  "packages": {
+    "apman": "68-r1",
+    "homesync": "7-r3",
+    "libubus-lua-async": "2026.06.28~24864e78-r2",
+    "lua-mosquitto": "0.4.1.9.1-r2",
+    "luacurl": "0.3.13-r1",
+    "nsca-ng": "1.7-r1",
+    "snapclient-mptcp": "0.35.0-r1",
+    "snapserver-mptcp": "0.35.0-r1",
+    "usb-relay-hid": "2.2.0.1-r0",
+    "wpad-ieee8021x": "1-r3",
+    "wpad-saeradh2e": "2026.08.07~831364bf-r3"
+  }
+}
